@@ -1,0 +1,1434 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Source of Funds Viewer</title>
+    <style>
+        :root {
+            --bg: #f4f6fb;
+            --bg-elev: #ffffff;
+            --bg-card: #ffffff;
+            --bg-soft: #eef1f7;
+            --bg-section: #f7f9fd;
+            --border: #e3e7ef;
+            --border-strong: #cfd6e4;
+            --text: #1b2230;
+            --text-muted: #5b6677;
+            --text-dim: #8893a7;
+            --accent: #f7931a;
+            --accent-2: #2b6ef2;
+            --in-color: #3ab795;
+            --out-color: #ef6f6c;
+            --shadow: 0 1px 2px rgba(20, 30, 60, 0.04), 0 4px 12px rgba(20, 30, 60, 0.06);
+            --radius: 14px;
+            --radius-sm: 8px;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        }
+        [data-theme="dark"] {
+            --bg: #0e131c;
+            --bg-elev: #151b26;
+            --bg-card: #1a212e;
+            --bg-soft: #1f2734;
+            --bg-section: #1c2330;
+            --border: #28303f;
+            --border-strong: #3a4458;
+            --text: #e7ecf3;
+            --text-muted: #aab3c2;
+            --text-dim: #7d8597;
+            --accent: #f7931a;
+            --accent-2: #5b8def;
+            --in-color: #4ecca3;
+            --out-color: #ff8a87;
+            --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.35);
+        }
+
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0; padding: 0;
+            background: var(--bg); color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 14px; line-height: 1.45;
+        }
+        a { color: var(--accent-2); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        header.app {
+            position: sticky; top: 0; z-index: 50;
+            background: var(--bg-elev);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: saturate(150%) blur(6px);
+        }
+        .app-inner {
+            max-width: 1400px; margin: 0 auto;
+            padding: 14px 20px;
+            display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+        }
+        .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; }
+        .brand .logo {
+            width: 26px; height: 26px; border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent), #ffb454);
+            box-shadow: 0 0 0 2px rgba(247,147,26,0.15) inset;
+        }
+        .spacer { flex: 1 1 auto; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        .btn, .input, .select {
+            background: var(--bg-card); color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 8px 12px; font-size: 13px; font-family: inherit; outline: none;
+            transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+        }
+        .btn { cursor: pointer; }
+        .btn:hover { border-color: var(--border-strong); }
+        .input:focus, .select:focus { border-color: var(--accent-2); }
+        .input.search { min-width: 260px; }
+
+        .search-group {
+            display: inline-flex;
+            align-items: stretch;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            background: var(--bg-card);
+        }
+        .search-group:focus-within { border-color: var(--accent-2); }
+        .search-group .input,
+        .search-group .select {
+            border: none;
+            border-radius: 0;
+            background: transparent;
+        }
+        .search-group .search-scope {
+            border-left: 1px solid var(--border);
+            color: var(--text-muted);
+            max-width: 260px;
+        }
+
+        main { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        .meta-bar {
+            display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
+            color: var(--text-muted); font-size: 12.5px; margin-bottom: 14px;
+        }
+        .meta-bar .chip {
+            background: var(--bg-soft); border: 1px solid var(--border);
+            border-radius: 999px; padding: 3px 10px;
+        }
+
+        .panel {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); box-shadow: var(--shadow);
+            margin-bottom: 18px; overflow: hidden;
+        }
+        .panel-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; cursor: pointer; user-select: none;
+            background: var(--bg-soft); border-bottom: 1px solid var(--border);
+            font-weight: 600; font-size: 13px;
+        }
+        .panel-header .chev { transition: transform 200ms ease; color: var(--text-dim); }
+        .panel.collapsed .chev { transform: rotate(-90deg); }
+        .panel.collapsed .panel-body { display: none; }
+        .panel-body { padding: 12px 14px; }
+
+        .col-group {
+            border: 1px dashed var(--border); border-radius: var(--radius-sm);
+            padding: 8px 10px 4px; margin-bottom: 10px; background: var(--bg-section);
+        }
+        .col-group h4 {
+            margin: 0 0 6px; font-size: 11.5px; text-transform: uppercase;
+            letter-spacing: 0.6px; color: var(--text-dim);
+        }
+        .col-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 4px 14px;
+        }
+        .col-grid label {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12.5px; color: var(--text-muted); padding: 2px 0; cursor: pointer;
+        }
+        .col-grid input[type="checkbox"] { accent-color: var(--accent); }
+        .col-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+
+        .year-header {
+            display: flex; align-items: center; gap: 12px;
+            margin: 22px 0 10px; padding: 10px 16px;
+            background: linear-gradient(90deg, var(--bg-soft), transparent);
+            border-left: 4px solid var(--accent); border-radius: var(--radius-sm);
+            font-weight: 700; font-size: 15px; letter-spacing: 0.5px; color: var(--text);
+        }
+        .year-header .count {
+            font-weight: 500; font-size: 12px; color: var(--text-muted);
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 999px; padding: 2px 10px;
+        }
+        .year-header:first-child { margin-top: 4px; }
+
+        .cards { display: grid; grid-template-columns: 1fr; gap: 14px; }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--event-color, var(--accent));
+            border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+        }
+        .card:hover { border-color: var(--border-strong); }
+        .card-head {
+            display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+            padding: 10px 14px; background: var(--bg-soft);
+            border-bottom: 1px solid var(--border);
+        }
+        .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--event-color, var(--accent)); color: #111;
+            font-weight: 700; font-size: 11.5px; letter-spacing: 0.4px;
+            text-transform: uppercase; padding: 3px 10px; border-radius: 999px;
+        }
+        .badge.subtle {
+            background: var(--bg-card); color: var(--text-muted);
+            border: 1px solid var(--border); font-weight: 600;
+        }
+        .card-head .when { font-size: 12.5px; color: var(--text-muted); }
+        .card-body { padding: 4px 0 6px; }
+
+        .section { border-top: 1px solid var(--border); }
+        .section:first-child { border-top: none; }
+        .section-head {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; padding: 10px 14px 6px;
+        }
+        .section-title {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-size: 11.5px; font-weight: 700; letter-spacing: 0.6px;
+            text-transform: uppercase; color: var(--text-dim);
+        }
+        .section-title .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--accent-2); opacity: 0.7;
+        }
+        .toggle-link {
+            background: none; border: none; color: var(--accent-2);
+            font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 6px;
+        }
+        .toggle-link:hover { background: var(--bg-soft); text-decoration: underline; }
+
+        .section-body {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 2px 18px;
+            padding: 4px 14px 12px;
+        }
+        .section.collapsed .section-body { display: none; }
+
+        .field {
+            display: flex; flex-direction: column;
+            padding: 6px 0;
+            border-bottom: 1px dashed var(--border);
+            min-width: 0;
+        }
+        .field.full { grid-column: 1 / -1; }
+        .field .k {
+            font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--text-dim); margin-bottom: 2px;
+        }
+        .field .v {
+            font-size: 13px; color: var(--text);
+            word-break: break-word; overflow-wrap: anywhere;
+        }
+        .field .v.mono { font-family: var(--mono); font-size: 12.5px; }
+
+        .field.nowrap .v {
+            display: inline-block;
+            white-space: nowrap;
+            overflow-x: auto;
+            max-width: 100%;
+            vertical-align: middle;
+            padding-bottom: 2px;
+        }
+        .field.nowrap .v::-webkit-scrollbar { height: 6px; }
+        .field.nowrap .v::-webkit-scrollbar-thumb {
+            background: var(--border-strong); border-radius: 3px;
+        }
+
+        .pair-row {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+            gap: 18px;
+            border-bottom: 1px dashed var(--border);
+            padding: 6px 0;
+        }
+        .pair-row .field { padding: 0; border-bottom: none; }
+        @media (max-width: 720px) {
+            .pair-row { grid-template-columns: 1fr; }
+        }
+
+        .inline-link {
+            display: inline-flex; align-items: center; justify-content: center;
+            margin-left: 6px; width: 22px; height: 22px;
+            border-radius: 6px;
+            background: var(--bg-soft); border: 1px solid var(--border);
+            color: var(--accent-2); font-size: 12px; text-decoration: none;
+            vertical-align: middle;
+        }
+        .inline-link:hover {
+            background: var(--accent-2); color: #fff;
+            border-color: var(--accent-2); text-decoration: none;
+        }
+
+        .io-wrap {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            padding-top: 4px;
+        }
+        @media (max-width: 900px) {
+            .io-wrap { grid-template-columns: 1fr; }
+        }
+        .io-col {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-section);
+            overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        .io-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px;
+            font-size: 11.5px; font-weight: 700; letter-spacing: 0.6px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border);
+        }
+        .io-col.inputs .io-head { color: var(--in-color); border-left: 3px solid var(--in-color); }
+        .io-col.outputs .io-head { color: var(--out-color); border-left: 3px solid var(--out-color); }
+        .io-head .count {
+            font-size: 11px; color: var(--text-muted); font-weight: 500;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 999px; padding: 1px 8px;
+            letter-spacing: 0; text-transform: none;
+        }
+        .io-table { display: flex; flex-direction: column; }
+        .io-row {
+            display: grid;
+            grid-template-columns: 36px minmax(0, 1fr);
+            gap: 8px;
+            padding: 8px 12px;
+            border-top: 1px solid var(--border);
+        }
+        .io-row:first-child { border-top: none; }
+        .io-idx {
+            font-family: var(--mono); font-size: 12px;
+            color: var(--text-dim); padding-top: 2px;
+        }
+        .io-cell { min-width: 0; }
+        .io-addr {
+            display: flex; align-items: center;
+            font-family: var(--mono); font-size: 12.5px;
+            word-break: break-all; overflow-wrap: anywhere;
+        }
+        .io-meta {
+            display: flex; flex-wrap: wrap; gap: 8px 14px;
+            margin-top: 2px; font-size: 12px; color: var(--text-muted);
+        }
+        .io-meta .v-btc { font-family: var(--mono); color: var(--text); }
+        .io-empty {
+            padding: 14px; color: var(--text-dim);
+            font-style: italic; text-align: center;
+        }
+
+        .doc-list {
+            grid-column: 1 / -1;
+            display: flex; flex-wrap: wrap; gap: 6px; padding-top: 4px;
+        }
+        .doc-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--bg-soft); border: 1px solid var(--border);
+            color: var(--text); padding: 5px 10px;
+            border-radius: 999px; font-size: 12px; font-family: var(--mono);
+            text-decoration: none;
+        }
+        .doc-pill:hover {
+            background: var(--accent-2); color: #fff;
+            border-color: var(--accent-2); text-decoration: none;
+        }
+        .doc-pill::before { content: "📄"; }
+
+        .empty-state {
+            text-align: center; padding: 60px 20px;
+            color: var(--text-muted); background: var(--bg-card);
+            border: 1px dashed var(--border-strong); border-radius: var(--radius);
+        }
+        .empty-state h2 { margin: 0 0 6px; color: var(--text); font-size: 16px; }
+
+        .buy-summary { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .buy-summary th, .buy-summary td {
+            padding: 8px 12px; text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+        .buy-summary thead th {
+            font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.6px;
+            color: var(--text-dim); font-weight: 700;
+        }
+        .buy-summary td.num, .buy-summary th.num {
+            text-align: right; font-family: var(--mono); white-space: nowrap;
+        }
+        .buy-summary tfoot th {
+            border-top: 2px solid var(--border-strong); border-bottom: none;
+            font-weight: 700; color: var(--text);
+        }
+        .buy-summary tbody tr:hover { background: var(--bg-soft); }
+
+        .hint { font-size: 12px; color: var(--text-dim); }
+        @media (max-width: 640px) {
+            .input.search { min-width: 0; flex: 1 1 100%; }
+            .search-group { flex: 1 1 100%; }
+        }
+    </style>
+</head>
+<body>
+<header class="app">
+    <div class="app-inner">
+        <div class="brand"><div class="logo" aria-hidden="true"></div>Source of Funds Viewer</div>
+        <div class="spacer"></div>
+        <div class="toolbar">
+            <div class="search-group">
+                <input id="search" class="input search" type="search" placeholder="Suchen…" />
+                <select id="searchScope" class="select search-scope" title="Suchbereich">
+                    <option value="__all__" selected>🔎 Alle Felder durchsuchen</option>
+                </select>
+            </div>
+            <select id="sortField" class="select" title="Sortierfeld"></select>
+            <select id="sortDir" class="select" title="Sortierrichtung">
+                <option value="asc">▲ Aufsteigend</option>
+                <option value="desc">▼ Absteigend</option>
+            </select>
+            <label class="btn" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer">
+                📁 CSV laden
+                <input id="file" type="file" accept=".csv,text/csv" style="display:none" />
+            </label>
+            <button id="themeToggle" class="btn" title="Hell / Dunkel umschalten">🌙 Dunkel</button>
+        </div>
+    </div>
+</header>
+
+<main>
+    <div class="meta-bar" id="metaBar">
+        <span class="chip" id="chipFile">Keine Datei geladen</span>
+        <span class="chip" id="chipRows">0 Zeilen</span>
+        <span class="chip" id="chipGroups">0 Vorgänge</span>
+        <span class="hint">Standard-Sortierung: <code>event_date_time_utc</code> (auf).</span>
+    </div>
+
+    <section class="panel collapsed" id="colPanel">
+        <div class="panel-header" id="colPanelHeader">
+            <span>Spalten ein-/ausblenden</span>
+            <span class="chev">▾</span>
+        </div>
+        <div class="panel-body">
+            <div class="col-actions">
+                <button class="btn" id="colAll">Alle aktivieren</button>
+                <button class="btn" id="colNone">Alle deaktivieren</button>
+                <button class="btn" id="colDefault">Standard</button>
+            </div>
+            <div id="colGroups"></div>
+        </div>
+    </section>
+
+    <div id="content">
+        <div class="empty-state">
+            <h2>Noch keine CSV geladen</h2>
+            <div>Lade oben rechts eine CSV-Datei (Trennzeichen <code>;</code>) hoch, um zu starten.</div>
+        </div>
+    </div>
+
+    <div id="buySummary"></div>
+</main>
+
+<script>
+    /* =========================================================
+       Configuration
+       ========================================================= */
+    const HIDDEN_COLS = new Set([
+        'transaction_explorer_url_link',
+        'address_explorer_url_link',
+        'event',
+        'event_date_time_utc',
+        'event_id',
+        'event_date_time_mez',
+        'transaction_explorer_url',
+        'address_explorer_url'
+    ]);
+
+    const IO_COLS = new Set(['address_index', 'address_type', 'address', 'address_value_btc', 'address_owner']);
+
+    const XPUB_PAIRS = [
+        ['extended_public_key_1', 'extended_public_key_1_fingerprint'],
+        ['extended_public_key_2', 'extended_public_key_2_fingerprint']
+    ];
+    const XPUB_FLAT = new Set(XPUB_PAIRS.flat());
+
+    const FULL_WIDTH_NOWRAP = new Set(['transaction_id', 'blockhash']);
+    const FULL_WIDTH_WRAP = new Set(['description_owner', 'description_authority']);
+
+    // Document columns (used to recognize document fields)
+    const DOCUMENT_COLS = new Set([
+        'documents_1','documents_2','documents_3','documents_4','documents_5','documents_6',
+        'documents_7','documents_8','documents_9','documents_10','documents_11','documents_12'
+    ]);
+
+    /* =========================================================
+       Translations
+       ========================================================= */
+    const EVENT_LABELS = {
+        transaction: 'Transaktion',
+        buy: 'Kauf',
+        sell: 'Verkauf',
+        deposit: 'Einzahlung',
+        withdrawal: 'Auszahlung',
+        gift: 'Geschenk'
+    };
+    function translateEvent(ev) {
+        if (!ev) return '';
+        const k = String(ev).toLowerCase();
+        return EVENT_LABELS[k] || ev;
+    }
+
+    const FIELD_LABELS = {
+        transaction_id: 'Transaktions-ID',
+        transaction_fee_btc: 'Transaktions-Gebühr (BTC)',
+        address_index: 'Adress-Index',
+        address_type: 'Adress-Typ',
+        address: 'Adresse',
+        address_value_btc: 'Adresswert (BTC)',
+        address_owner: 'Adress-Eigentümer',
+        blockheight: 'Blockhöhe',
+        blockhash: 'Blockhash',
+        wallet_account_number: 'Wallet Account Nummer',
+        wallet_account_name: 'Wallet Account',
+        derivation_path: 'Ableitungspfad',
+        extended_public_key_1: 'Erweiterter öffentlicher Schlüssel 1',
+        extended_public_key_1_fingerprint: 'Fingerprint 1',
+        extended_public_key_2: 'Erweiterter öffentlicher Schlüssel 2',
+        extended_public_key_2_fingerprint: 'Fingerprint 2',
+        exchange_name: 'Börse',
+        exchange_type: 'Börsen-Typ',
+        exchange_rate_btc_eur: 'Kurs (EUR/BTC)',
+        exchange_fee_btc: 'Börsen-Gebühr (BTC)',
+        exchange_fee_euro: 'Börsen-Gebühr (Euro)',
+        amount_btc: 'Betrag (BTC)',
+        amount_euro: 'Betrag (Euro)',
+        description_owner: 'Eigentümer',
+        description_authority: 'Behörden',
+        documents_1: 'Dokument 1',  documents_2: 'Dokument 2',  documents_3: 'Dokument 3',
+        documents_4: 'Dokument 4',  documents_5: 'Dokument 5',  documents_6: 'Dokument 6',
+        documents_7: 'Dokument 7',  documents_8: 'Dokument 8',  documents_9: 'Dokument 9',
+        documents_10: 'Dokument 10', documents_11: 'Dokument 11', documents_12: 'Dokument 12'
+    };
+    function labelOf(col) {
+        return FIELD_LABELS[col] || col;
+    }
+
+    const SECTIONS = [
+        {
+            id: 'transaction',
+            title: 'Informationen zur Transaktion',
+            dot: '#5b8def',
+            collapsedByDefault: false,
+            columns: [
+                'transaction_id',
+                'transaction_fee_btc',
+                'address_index', 'address_type',
+                'address', 'address_value_btc', 'address_owner'
+            ]
+        },
+        {
+            id: 'tx_extra',
+            title: 'Block-Informationen',
+            dot: '#94a3b8',
+            collapsedByDefault: true,
+            columns: ['blockheight', 'blockhash']
+        },
+        {
+            id: 'wallet',
+            title: 'Wallet-Infos',
+            dot: '#3ab795',
+            collapsedByDefault: false,
+            columns: [
+                'wallet_account_number', 'wallet_account_name', 'derivation_path',
+                'extended_public_key_1', 'extended_public_key_1_fingerprint',
+                'extended_public_key_2', 'extended_public_key_2_fingerprint'
+            ]
+        },
+        {
+            id: 'exchange',
+            title: 'Börsen-Daten',
+            dot: '#e9c46a',
+            collapsedByDefault: false,
+            columns: [
+                'exchange_name', 'exchange_type',
+                'exchange_rate_btc_eur', 'exchange_fee_btc', 'exchange_fee_euro',
+                'amount_btc', 'amount_euro'
+            ]
+        },
+        {
+            id: 'descriptions',
+            title: 'Beschreibungen',
+            dot: '#d96bd9',
+            collapsedByDefault: false,
+            columns: ['description_owner', 'description_authority']
+        },
+        {
+            id: 'documents',
+            title: 'Nachweise',
+            dot: '#22b8cf',
+            collapsedByDefault: false,
+            columns: [
+                'documents_1','documents_2','documents_3','documents_4','documents_5','documents_6',
+                'documents_7','documents_8','documents_9','documents_10','documents_11','documents_12'
+            ]
+        }
+    ];
+
+    // Per-event default-collapse overrides
+    const EVENT_DEFAULT_COLLAPSED_SECTIONS = {
+        deposit:     new Set(['transaction']),
+        buy:         new Set(['transaction']),
+        sell:        new Set(['transaction']),
+        gift:        new Set(['transaction']),
+        transaction: new Set(['exchange'])
+    };
+
+    function isSectionCollapsedByDefault(sec, eventValue) {
+        const ev = String(eventValue || '').toLowerCase();
+        const overrides = EVENT_DEFAULT_COLLAPSED_SECTIONS[ev];
+        if (overrides && overrides.has(sec.id)) return true;
+        return !!sec.collapsedByDefault;
+    }
+
+    const INLINE_LINK_MAP = {
+        transaction_id: 'transaction_explorer_url',
+        address: 'address_explorer_url'
+    };
+
+    const NUMERIC_HINTS = [
+        'btc', 'euro', 'eur', 'amount', 'fee', 'rate', 'blockheight', 'index', 'event_id', 'wallet_account_number'
+    ];
+
+    const EVENT_PALETTE = [
+        '#f7931a', '#3ab795', '#5b8def', '#d96bd9',
+        '#e9c46a', '#ef6f6c', '#7a5cff', '#22b8cf',
+        '#b08968', '#94a3b8'
+    ];
+
+    /* =========================================================
+       State
+       ========================================================= */
+    const state = {
+        headers: [],
+        visibleCols: new Set(),
+        rows: [],
+        groups: [],
+        sortField: 'event_date_time_utc',
+        sortDir: 'asc',
+        search: '',
+        searchScope: '__all__',
+        eventColors: new Map(),
+        fileName: null,
+        sectionCollapsed: new Map()
+    };
+
+    /* =========================================================
+       Theme
+       ========================================================= */
+    const themeBtn = document.getElementById('themeToggle');
+    function applyTheme(t) {
+        document.documentElement.setAttribute('data-theme', t);
+        themeBtn.textContent = t === 'dark' ? '☀️ Hell' : '🌙 Dunkel';
+        localStorage.setItem('sofv-theme', t);
+    }
+    applyTheme(localStorage.getItem('sofv-theme') || 'light');
+    themeBtn.addEventListener('click', () => {
+        const cur = document.documentElement.getAttribute('data-theme');
+        applyTheme(cur === 'dark' ? 'light' : 'dark');
+    });
+
+    /* =========================================================
+       CSV parser
+       ========================================================= */
+    function parseCSV(text) {
+        text = text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+        const rows = [];
+        let cur = [], field = '', inQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+            const c = text[i];
+            if (inQuotes) {
+                if (c === '"') {
+                    if (text[i + 1] === '"') { field += '"'; i++; }
+                    else inQuotes = false;
+                } else field += c;
+            } else {
+                if (c === '"') inQuotes = true;
+                else if (c === ';') { cur.push(field); field = ''; }
+                else if (c === '\n') { cur.push(field); rows.push(cur); cur = []; field = ''; }
+                else field += c;
+            }
+        }
+        if (field.length > 0 || cur.length > 0) { cur.push(field); rows.push(cur); }
+        if (!rows.length) return { headers: [], data: [] };
+
+        let headers = rows[0].map(h => h.trim());
+        while (headers.length && headers[headers.length - 1] === '') headers.pop();
+
+        const data = [];
+        for (let r = 1; r < rows.length; r++) {
+            const row = rows[r];
+            if (row.length === 1 && row[0].trim() === '') continue;
+            if (row.every(v => v === '')) continue;
+            const obj = {};
+            for (let c = 0; c < headers.length; c++) obj[headers[c]] = (row[c] ?? '').trim();
+            data.push(obj);
+        }
+        return { headers, data };
+    }
+
+    /* =========================================================
+       Helpers
+       ========================================================= */
+    function isNumericHeader(h) {
+        const lo = h.toLowerCase();
+        return NUMERIC_HINTS.some(k => lo.includes(k));
+    }
+    function parseGermanNumber(s) {
+        if (s == null) return NaN;
+        const t = String(s).trim();
+        if (t === '') return NaN;
+        const n = t.includes(',') ? Number(t.replace(/\./g, '').replace(',', '.')) : Number(t);
+        return isNaN(n) ? NaN : n;
+    }
+    function parseDateMaybe(s) {
+        if (!s) return null;
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    function getYearFromRow(row) {
+        const d = parseDateMaybe(row['event_date_time_utc']);
+        if (d) return String(d.getUTCFullYear());
+        const raw = (row['event_date_time_utc'] || '').match(/\d{4}/);
+        return raw ? raw[0] : '—';
+    }
+    function escapeHtml(s) {
+        return String(s ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function shorten(s, head = 10, tail = 8) {
+        if (!s) return '';
+        if (s.length <= head + tail + 1) return s;
+        return s.slice(0, head) + '…' + s.slice(-tail);
+    }
+    function nonEmpty(v) {
+        return v !== undefined && v !== null && String(v).trim() !== '';
+    }
+    function isMonoLike(header, value) {
+        return /^(transaction_id|address|blockhash|extended_public_key|derivation_path|.*_fingerprint)$/i.test(header)
+            || /^[a-f0-9]{20,}$/i.test(value || '');
+    }
+    function assignEventColors(rows) {
+        state.eventColors.clear();
+        const seen = [];
+        for (const r of rows) {
+            const ev = (r.event || '').toLowerCase();
+            if (ev && !state.eventColors.has(ev)) {
+                state.eventColors.set(ev, EVENT_PALETTE[seen.length % EVENT_PALETTE.length]);
+                seen.push(ev);
+            }
+        }
+    }
+
+    /**
+     * Build a relative URL that points to a file next to this HTML file.
+     */
+    function buildDocumentUrl(rawValue) {
+        const v = String(rawValue || '').trim();
+        if (!v) return '';
+        if (/^(https?:|file:)/i.test(v)) return v;
+        if (v.startsWith('./') || v.startsWith('../') || v.startsWith('/')) return v;
+        const parts = v.split(/[\\/]/).filter(Boolean).map(encodeURIComponent);
+        return parts.join('/');
+    }
+
+    /* =========================================================
+       Grouping: transactions sharing transaction_id form one card
+       ========================================================= */
+    function buildGroups(rows) {
+        const groups = [];
+        const txIndex = new Map();
+        for (const r of rows) {
+            const ev = (r.event || '').toLowerCase();
+            const txid = (r.transaction_id || '').trim();
+            if (ev === 'transaction' && txid) {
+                let g = txIndex.get(txid);
+                if (!g) {
+                    g = { key: 'tx:' + txid, primary: r, rows: [] };
+                    txIndex.set(txid, g);
+                    groups.push(g);
+                }
+                g.rows.push(r);
+            } else {
+                groups.push({ key: 'row:' + groups.length, primary: r, rows: [r] });
+            }
+        }
+        for (const g of groups) {
+            if (g.rows.length > 1) {
+                g.primary = g.rows.slice().sort((a, b) => {
+                    const ca = Object.values(a).filter(v => nonEmpty(v)).length;
+                    const cb = Object.values(b).filter(v => nonEmpty(v)).length;
+                    return cb - ca;
+                })[0];
+            }
+        }
+        return groups;
+    }
+
+    /* =========================================================
+       Column filter panel
+       ========================================================= */
+    function renderColumnFilters() {
+        const root = document.getElementById('colGroups');
+        root.innerHTML = '';
+        const knownCols = new Set();
+        SECTIONS.forEach(s => s.columns.forEach(c => knownCols.add(c)));
+
+        for (const sec of SECTIONS) {
+            const cols = sec.columns.filter(c => state.headers.includes(c));
+            if (!cols.length) continue;
+            const group = document.createElement('div');
+            group.className = 'col-group';
+            group.innerHTML = `
+                <h4>${escapeHtml(sec.title)}</h4>
+                <div class="col-grid">
+                    ${cols.map(h => `
+                        <label title="${escapeHtml(h)}">
+                            <input type="checkbox" data-col="${escapeHtml(h)}" ${state.visibleCols.has(h) ? 'checked' : ''}/>
+                            <span>${escapeHtml(labelOf(h))}</span>
+                        </label>
+                    `).join('')}
+                </div>`;
+            root.appendChild(group);
+        }
+        const others = state.headers.filter(h => !knownCols.has(h) && !HIDDEN_COLS.has(h));
+        if (others.length) {
+            const group = document.createElement('div');
+            group.className = 'col-group';
+            group.innerHTML = `
+                <h4>Weitere</h4>
+                <div class="col-grid">
+                    ${others.map(h => `
+                        <label title="${escapeHtml(h)}">
+                            <input type="checkbox" data-col="${escapeHtml(h)}" ${state.visibleCols.has(h) ? 'checked' : ''}/>
+                            <span>${escapeHtml(labelOf(h))}</span>
+                        </label>
+                    `).join('')}
+                </div>`;
+            root.appendChild(group);
+        }
+
+        root.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', () => {
+                const col = cb.dataset.col;
+                if (cb.checked) state.visibleCols.add(col);
+                else state.visibleCols.delete(col);
+                renderCards();
+            });
+        });
+    }
+
+    function renderSortOptions() {
+        const sel = document.getElementById('sortField');
+        sel.innerHTML = '';
+        const opts = state.headers.filter(h => !['transaction_explorer_url_link','address_explorer_url_link'].includes(h));
+        for (const h of opts) {
+            const o = document.createElement('option');
+            o.value = h;
+            o.textContent = labelOf(h);
+            o.title = h;
+            if (h === state.sortField) o.selected = true;
+            sel.appendChild(o);
+        }
+    }
+
+    function renderSearchScopeOptions() {
+        const sel = document.getElementById('searchScope');
+        sel.innerHTML = '';
+
+        const allOpt = document.createElement('option');
+        allOpt.value = '__all__';
+        allOpt.textContent = '🔎 Alle Felder durchsuchen';
+        sel.appendChild(allOpt);
+
+        const sep = document.createElement('option');
+        sep.disabled = true;
+        sep.textContent = '──────────';
+        sel.appendChild(sep);
+
+        const knownCols = new Set();
+        SECTIONS.forEach(s => s.columns.forEach(c => knownCols.add(c)));
+
+        for (const sec of SECTIONS) {
+            const cols = sec.columns.filter(c => state.headers.includes(c));
+            if (!cols.length) continue;
+            const og = document.createElement('optgroup');
+            og.label = sec.title;
+            for (const c of cols) {
+                const o = document.createElement('option');
+                o.value = c;
+                o.textContent = labelOf(c);
+                o.title = c;
+                og.appendChild(o);
+            }
+            sel.appendChild(og);
+        }
+        const others = state.headers.filter(h => !knownCols.has(h) && !HIDDEN_COLS.has(h));
+        if (others.length) {
+            const og = document.createElement('optgroup');
+            og.label = 'Weitere';
+            for (const c of others) {
+                const o = document.createElement('option');
+                o.value = c;
+                o.textContent = labelOf(c);
+                o.title = c;
+                og.appendChild(o);
+            }
+            sel.appendChild(og);
+        }
+
+        if (state.searchScope !== '__all__' && !state.headers.includes(state.searchScope)) {
+            state.searchScope = '__all__';
+        }
+        sel.value = state.searchScope;
+    }
+
+    /* =========================================================
+       Filter / sort
+       ========================================================= */
+    function groupMatchesSearch(g, q, scope) {
+        if (!q) return true;
+        const cols = (scope && scope !== '__all__')
+            ? [scope]
+            : state.headers.filter(h => !['transaction_explorer_url_link','address_explorer_url_link'].includes(h));
+
+        for (const r of g.rows) {
+            for (const h of cols) {
+                const v = r[h];
+                if (v && String(v).toLowerCase().includes(q)) return true;
+            }
+        }
+        return false;
+    }
+
+    function filteredSortedGroups() {
+        const q = state.search.trim().toLowerCase();
+        const scope = state.searchScope;
+        let groups = state.groups.filter(g => groupMatchesSearch(g, q, scope));
+
+        const sf = state.sortField;
+        const dir = state.sortDir === 'desc' ? -1 : 1;
+        const numeric = isNumericHeader(sf);
+        const dateLike = /date|time/i.test(sf);
+
+        groups = groups.slice().sort((a, b) => {
+            const av = a.primary[sf] ?? '', bv = b.primary[sf] ?? '';
+            if (dateLike) {
+                const da = parseDateMaybe(av), db = parseDateMaybe(bv);
+                if (da && db) return (da - db) * dir;
+                if (da && !db) return -1 * dir;
+                if (!da && db) return 1 * dir;
+            }
+            if (numeric) {
+                const na = parseGermanNumber(av), nb = parseGermanNumber(bv);
+                const aNaN = isNaN(na), bNaN = isNaN(nb);
+                if (!aNaN && !bNaN) return (na - nb) * dir;
+                if (!aNaN && bNaN) return -1 * dir;
+                if (aNaN && !bNaN) return 1 * dir;
+            }
+            return String(av).localeCompare(String(bv), 'de', { numeric: true, sensitivity: 'base' }) * dir;
+        });
+        return groups;
+    }
+
+    /* =========================================================
+       Field rendering
+       ========================================================= */
+    function renderFieldHTML(header, row) {
+        const value = row[header] || '';
+        if (!nonEmpty(value)) return '';
+
+        // Document fields, if rendered outside the dedicated documents-section,
+        // should still be clickable links.
+        if (DOCUMENT_COLS.has(header)) {
+            const url = buildDocumentUrl(value);
+            const classes = ['field'];
+            if (FULL_WIDTH_WRAP.has(header)) classes.push('full');
+            return `
+                <div class="${classes.join(' ')}">
+                    <div class="k" title="${escapeHtml(header)}">${escapeHtml(labelOf(header))}</div>
+                    <div>
+                        <a class="v mono" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" download
+                           title="Datei öffnen: ${escapeHtml(value)}">${escapeHtml(value)} ↗</a>
+                    </div>
+                </div>`;
+        }
+
+        const linkColumn = INLINE_LINK_MAP[header];
+        const linkUrl = linkColumn ? (row[linkColumn] || '').trim() : '';
+
+        let valueHtml;
+        if (/^https?:\/\//i.test(value)) {
+            valueHtml = `<a class="v mono" href="${escapeHtml(value)}" target="_blank" rel="noopener noreferrer">${escapeHtml(shorten(value, 28, 8))} ↗</a>`;
+        } else {
+            const mono = isMonoLike(header, value);
+            valueHtml = `<span class="v ${mono ? 'mono' : ''}">${escapeHtml(value)}</span>`;
+        }
+
+        let linkHtml = '';
+        if (linkUrl && /^https?:\/\//i.test(linkUrl)) {
+            linkHtml = ` <a class="inline-link" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" title="Im Explorer öffnen">↗</a>`;
+        }
+
+        const classes = ['field'];
+        if (FULL_WIDTH_NOWRAP.has(header)) classes.push('full', 'nowrap');
+        else if (FULL_WIDTH_WRAP.has(header)) classes.push('full');
+
+        return `
+            <div class="${classes.join(' ')}">
+                <div class="k" title="${escapeHtml(header)}">${escapeHtml(labelOf(header))}</div>
+                <div>${valueHtml}${linkHtml}</div>
+            </div>`;
+    }
+
+    function renderXpubPair(row, keyCol, fpCol) {
+        const keyVal = (row[keyCol] || '').trim();
+        const fpVal  = (row[fpCol] || '').trim();
+        if (!nonEmpty(keyVal) && !nonEmpty(fpVal)) return '';
+        if (!state.visibleCols.has(keyCol) && !state.visibleCols.has(fpCol)) return '';
+
+        const parts = [];
+        if (state.visibleCols.has(keyCol) && nonEmpty(keyVal)) {
+            parts.push(`
+                <div class="field">
+                    <div class="k" title="${escapeHtml(keyCol)}">${escapeHtml(labelOf(keyCol))}</div>
+                    <div><span class="v mono">${escapeHtml(keyVal)}</span></div>
+                </div>`);
+        }
+        if (state.visibleCols.has(fpCol) && nonEmpty(fpVal)) {
+            parts.push(`
+                <div class="field">
+                    <div class="k" title="${escapeHtml(fpCol)}">${escapeHtml(labelOf(fpCol))}</div>
+                    <div><span class="v mono">${escapeHtml(fpVal)}</span></div>
+                </div>`);
+        }
+        if (!parts.length) return '';
+        return `<div class="pair-row">${parts.join('')}</div>`;
+    }
+
+    /* =========================================================
+       Inputs / Outputs block
+       ========================================================= */
+    function renderIORow(r) {
+        const addr = (r.address || '').trim();
+        const value = (r.address_value_btc || '').trim();
+        const owner = (r.address_owner || '').trim();
+        const idx = (r.address_index || '').trim();
+        const linkUrl = (r.address_explorer_url || '').trim();
+
+        const linkHtml = /^https?:\/\//i.test(linkUrl)
+            ? ` <a class="inline-link" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener noreferrer" title="Im Explorer öffnen">↗</a>`
+            : '';
+
+        const metaParts = [];
+        if (nonEmpty(value)) metaParts.push(`<span><span class="v-btc">${escapeHtml(value)}</span> BTC</span>`);
+        if (nonEmpty(owner)) metaParts.push(`<span>👤 ${escapeHtml(owner)}</span>`);
+
+        return `
+            <div class="io-row">
+                <div class="io-idx">#${escapeHtml(idx || '–')}</div>
+                <div class="io-cell">
+                    <div class="io-addr">${escapeHtml(addr || '—')}${linkHtml}</div>
+                    ${metaParts.length ? `<div class="io-meta">${metaParts.join('')}</div>` : ''}
+                </div>
+            </div>`;
+    }
+
+    function renderIOBlock(group) {
+        const rows = group.rows;
+        const sortByIdx = (a, b) => {
+            const ai = parseGermanNumber(a.address_index);
+            const bi = parseGermanNumber(b.address_index);
+            const aNaN = isNaN(ai), bNaN = isNaN(bi);
+            if (!aNaN && !bNaN) return ai - bi;
+            if (!aNaN && bNaN) return -1;
+            if (aNaN && !bNaN) return 1;
+            return String(a.address_index || '').localeCompare(String(b.address_index || ''), 'de', { numeric: true });
+        };
+        const inputs = rows.filter(r => (r.address_type || '').toLowerCase() === 'input').sort(sortByIdx);
+        const outputs = rows.filter(r => (r.address_type || '').toLowerCase() === 'output').sort(sortByIdx);
+        if (!inputs.length && !outputs.length) return '';
+
+        const inputsHtml = inputs.length
+            ? inputs.map(renderIORow).join('')
+            : `<div class="io-empty">Keine Inputs</div>`;
+        const outputsHtml = outputs.length
+            ? outputs.map(renderIORow).join('')
+            : `<div class="io-empty">Keine Outputs</div>`;
+
+        return `
+            <div class="io-wrap">
+                <div class="io-col inputs">
+                    <div class="io-head">
+                        <span>▼ Inputs</span>
+                        <span class="count">${inputs.length}</span>
+                    </div>
+                    <div class="io-table">${inputsHtml}</div>
+                </div>
+                <div class="io-col outputs">
+                    <div class="io-head">
+                        <span>▲ Outputs</span>
+                        <span class="count">${outputs.length}</span>
+                    </div>
+                    <div class="io-table">${outputsHtml}</div>
+                </div>
+            </div>`;
+    }
+
+    /* =========================================================
+       Sections
+       ========================================================= */
+    function renderRegularSection(group, sec, cardIdx) {
+        const row = group.primary;
+        const isTxSection = sec.id === 'transaction';
+        const isWalletSection = sec.id === 'wallet';
+
+        const cols = sec.columns.filter(c => {
+            if (!state.headers.includes(c)) return false;
+            if (!state.visibleCols.has(c)) return false;
+            if (HIDDEN_COLS.has(c)) return false;
+            if (isTxSection && IO_COLS.has(c)) return false;
+            if (isWalletSection && XPUB_FLAT.has(c)) return false;
+            return true;
+        });
+
+        const fieldsHtml = cols.map(c => renderFieldHTML(c, row)).filter(Boolean).join('');
+
+        let xpubHtml = '';
+        if (isWalletSection) {
+            xpubHtml = XPUB_PAIRS.map(([k, fp]) => renderXpubPair(row, k, fp)).filter(Boolean).join('');
+        }
+
+        let ioHtml = '';
+        if (isTxSection && (group.primary.event || '').toLowerCase() === 'transaction') {
+            ioHtml = renderIOBlock(group);
+        }
+
+        if (!fieldsHtml && !xpubHtml && !ioHtml) return '';
+
+        const key = `${sec.id}:${cardIdx}`;
+        const collapsed = state.sectionCollapsed.has(key)
+            ? state.sectionCollapsed.get(key)
+            : isSectionCollapsedByDefault(sec, group.primary.event);
+
+        return `
+            <div class="section ${collapsed ? 'collapsed' : ''}" data-section-key="${escapeHtml(key)}">
+                <div class="section-head">
+                    <span class="section-title"><span class="dot" style="background:${sec.dot}"></span>${escapeHtml(sec.title)}</span>
+                    <button class="toggle-link" data-toggle="${escapeHtml(key)}">${collapsed ? 'Einblenden' : 'Ausblenden'}</button>
+                </div>
+                <div class="section-body">
+                    ${fieldsHtml}
+                    ${xpubHtml}
+                    ${ioHtml}
+                </div>
+            </div>`;
+    }
+
+    function renderDocumentsSection(group, sec, cardIdx) {
+        const row = group.primary;
+        const cols = sec.columns.filter(c => state.headers.includes(c) && state.visibleCols.has(c));
+        const docs = cols
+            .map(c => ({ col: c, val: (row[c] || '').trim() }))
+            .filter(d => nonEmpty(d.val));
+        if (!docs.length) return '';
+
+        const key = `${sec.id}:${cardIdx}`;
+        const collapsed = state.sectionCollapsed.has(key)
+            ? state.sectionCollapsed.get(key)
+            : isSectionCollapsedByDefault(sec, group.primary.event);
+
+        const pillsHtml = docs.map(d => {
+            const url = buildDocumentUrl(d.val);
+            return `<a class="doc-pill" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" download
+                       title="${escapeHtml(labelOf(d.col))}: ${escapeHtml(d.val)}">${escapeHtml(d.val)}</a>`;
+        }).join('');
+
+        return `
+            <div class="section ${collapsed ? 'collapsed' : ''}" data-section-key="${escapeHtml(key)}">
+                <div class="section-head">
+                    <span class="section-title"><span class="dot" style="background:${sec.dot}"></span>${escapeHtml(sec.title)} <span style="color:var(--text-dim);font-weight:500;">· ${docs.length}</span></span>
+                    <button class="toggle-link" data-toggle="${escapeHtml(key)}">${collapsed ? 'Einblenden' : 'Ausblenden'}</button>
+                </div>
+                <div class="section-body">
+                    <div class="doc-list">${pillsHtml}</div>
+                </div>
+            </div>`;
+    }
+
+    function renderCard(group, cardIdx) {
+        const row = group.primary;
+        const evRaw = row.event || '';
+        const ev = evRaw.toLowerCase();
+        const color = state.eventColors.get(ev) || 'var(--accent)';
+        const when = row['event_date_time_mez'] || row['event_date_time_utc'] || '';
+        const id = row['event_id'] || '';
+
+        const sectionsHtml = SECTIONS.map(sec => {
+            if (sec.id === 'documents') return renderDocumentsSection(group, sec, cardIdx);
+            return renderRegularSection(group, sec, cardIdx);
+        }).filter(Boolean).join('');
+
+        const multiBadge = group.rows.length > 1
+            ? `<span class="badge subtle">${group.rows.length} Zeilen</span>`
+            : '';
+
+        const evLabel = translateEvent(evRaw) || 'Event';
+
+        return `
+            <article class="card" style="--event-color:${color}">
+                <header class="card-head">
+                    <span class="badge" title="${escapeHtml(evRaw)}">${escapeHtml(evLabel)}</span>
+                    ${nonEmpty(id) ? `<span class="badge subtle">#${escapeHtml(id)}</span>` : ''}
+                    ${multiBadge}
+                    ${nonEmpty(when) ? `<span class="when">🕒 ${escapeHtml(when)}</span>` : ''}
+                </header>
+                <div class="card-body">${sectionsHtml}</div>
+            </article>`;
+    }
+
+    /* =========================================================
+       Buy summary: amount_euro grouped by exchange_name
+       ========================================================= */
+    function formatGermanNumber(n) {
+        if (!isFinite(n)) return '';
+        return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function renderBuySummary() {
+        const container = document.getElementById('buySummary');
+        if (!container) return;
+
+        const sums = new Map();
+        for (const r of state.rows) {
+            if ((r.event || '').toLowerCase() !== 'buy') continue;
+            const name = (r.exchange_name || '').trim() || '— ohne Börse —';
+            const amount = parseGermanNumber(r.amount_euro);
+            if (isNaN(amount)) continue;
+            sums.set(name, (sums.get(name) || 0) + amount);
+        }
+
+        if (!sums.size) { container.innerHTML = ''; return; }
+
+        const entries = Array.from(sums.entries()).sort((a, b) => b[1] - a[1]);
+        let total = 0;
+        const rowsHtml = entries.map(([name, sum]) => {
+            total += sum;
+            return `<tr><td>${escapeHtml(name)}</td><td class="num">${escapeHtml(formatGermanNumber(sum))} €</td></tr>`;
+        }).join('');
+
+        container.innerHTML = `
+            <section class="panel" id="buySummaryPanel">
+                <div class="panel-header" id="buySummaryHeader">
+                    <span>Käufe – Summe (Euro) je Börse</span>
+                    <span class="chev">▾</span>
+                </div>
+                <div class="panel-body">
+                    <table class="buy-summary">
+                        <thead>
+                            <tr><th>Börse</th><th class="num">Summe (Euro)</th></tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                        <tfoot>
+                            <tr><th>Gesamt</th><th class="num">${escapeHtml(formatGermanNumber(total))} €</th></tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </section>`;
+
+        document.getElementById('buySummaryHeader').addEventListener('click', () => {
+            document.getElementById('buySummaryPanel').classList.toggle('collapsed');
+        });
+    }
+
+    /* =========================================================
+       Top-level render
+       ========================================================= */
+    function renderCards() {
+        const container = document.getElementById('content');
+        const groups = filteredSortedGroups();
+
+        document.getElementById('chipGroups').textContent = `${groups.length} Vorgänge sichtbar`;
+
+        if (!state.rows.length) {
+            container.innerHTML = `
+              <div class="empty-state">
+                <h2>Noch keine CSV geladen</h2>
+                <div>Lade oben rechts eine CSV-Datei (Trennzeichen <code>;</code>) hoch, um zu starten.</div>
+              </div>`;
+            return;
+        }
+        if (!groups.length) {
+            container.innerHTML = `
+              <div class="empty-state">
+                <h2>Keine Treffer</h2>
+                <div>Passe Suche oder Filter an.</div>
+              </div>`;
+            return;
+        }
+
+        const groupByYear = /date|time/i.test(state.sortField);
+        const html = [];
+
+        if (groupByYear) {
+            const counts = new Map();
+            groups.forEach(g => {
+                const y = getYearFromRow(g.primary);
+                counts.set(y, (counts.get(y) || 0) + 1);
+            });
+            let lastYear = null, openGroup = false;
+            groups.forEach((g, idx) => {
+                const y = getYearFromRow(g.primary);
+                if (y !== lastYear) {
+                    if (openGroup) html.push('</div>');
+                    html.push(`
+                        <div class="year-header">
+                            <span>📅 ${escapeHtml(y)}</span>
+                            <span class="count">${counts.get(y)} Vorgänge</span>
+                        </div>
+                        <div class="cards">`);
+                    openGroup = true;
+                    lastYear = y;
+                }
+                html.push(renderCard(g, idx));
+            });
+            if (openGroup) html.push('</div>');
+        } else {
+            html.push('<div class="cards">');
+            groups.forEach((g, idx) => html.push(renderCard(g, idx)));
+            html.push('</div>');
+        }
+
+        container.innerHTML = html.join('');
+
+        container.querySelectorAll('button.toggle-link[data-toggle]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.toggle;
+                const sec = container.querySelector(`.section[data-section-key="${CSS.escape(key)}"]`);
+                if (!sec) return;
+                const nowCollapsed = !sec.classList.contains('collapsed');
+                sec.classList.toggle('collapsed', nowCollapsed);
+                btn.textContent = nowCollapsed ? 'Einblenden' : 'Ausblenden';
+                state.sectionCollapsed.set(key, nowCollapsed);
+            });
+        });
+
+        renderBuySummary();
+    }
+
+    /* =========================================================
+       File loading & controls
+       ========================================================= */
+    function defaultVisibleCols(headers) {
+        const out = new Set();
+        for (const sec of SECTIONS) {
+            for (const c of sec.columns) {
+                if (headers.includes(c) && !HIDDEN_COLS.has(c)) out.add(c);
+            }
+        }
+        return out;
+    }
+
+    function loadCSVText(text, fileName) {
+        const { headers, data } = parseCSV(text);
+        if (!headers.length) { alert('Konnte keine Spaltenüberschriften finden.'); return; }
+        state.headers = headers;
+        state.rows = data;
+        state.fileName = fileName || null;
+        state.sectionCollapsed.clear();
+        state.visibleCols = defaultVisibleCols(headers);
+
+        if (headers.includes('event_date_time_utc')) {
+            state.sortField = 'event_date_time_utc';
+            state.sortDir = 'asc';
+        } else {
+            state.sortField = headers[0];
+        }
+
+        assignEventColors(data);
+        state.groups = buildGroups(data);
+
+        document.getElementById('chipFile').textContent = state.fileName ? `Datei: ${state.fileName}` : 'CSV geladen';
+        document.getElementById('chipRows').textContent = `${data.length} Zeilen`;
+
+        renderColumnFilters();
+        renderSortOptions();
+        renderSearchScopeOptions();
+        document.getElementById('sortDir').value = state.sortDir;
+        renderCards();
+    }
+
+    document.getElementById('file').addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => loadCSVText(String(reader.result || ''), f.name);
+        reader.onerror = () => alert('Fehler beim Lesen der Datei.');
+        reader.readAsText(f, 'utf-8');
+    });
+
+    document.getElementById('search').addEventListener('input', (e) => { state.search = e.target.value; renderCards(); });
+    document.getElementById('searchScope').addEventListener('change', (e) => {
+        state.searchScope = e.target.value || '__all__';
+        const inp = document.getElementById('search');
+        inp.placeholder = state.searchScope === '__all__'
+            ? 'Suchen…'
+            : `Suchen in ${labelOf(state.searchScope)}…`;
+        renderCards();
+    });
+    document.getElementById('sortField').addEventListener('change', (e) => { state.sortField = e.target.value; renderCards(); });
+    document.getElementById('sortDir').addEventListener('change', (e) => { state.sortDir = e.target.value; renderCards(); });
+
+    document.getElementById('colAll').addEventListener('click', () => {
+        const all = new Set();
+        for (const sec of SECTIONS) sec.columns.forEach(c => {
+            if (state.headers.includes(c) && !HIDDEN_COLS.has(c)) all.add(c);
+        });
+        for (const h of state.headers) if (!HIDDEN_COLS.has(h)) all.add(h);
+        state.visibleCols = all;
+        renderColumnFilters();
+        renderCards();
+    });
+    document.getElementById('colNone').addEventListener('click', () => {
+        state.visibleCols = new Set();
+        renderColumnFilters();
+        renderCards();
+    });
+    document.getElementById('colDefault').addEventListener('click', () => {
+        state.visibleCols = defaultVisibleCols(state.headers);
+        renderColumnFilters();
+        renderCards();
+    });
+
+    const panel = document.getElementById('colPanel');
+    document.getElementById('colPanelHeader').addEventListener('click', () => panel.classList.toggle('collapsed'));
+</script>
+</body>
+</html>
