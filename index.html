@@ -381,6 +381,26 @@
         .buy-summary tbody tr:hover { background: var(--bg-soft); }
 
         .hint { font-size: 12px; color: var(--text-dim); }
+
+        #buySummary { margin-top: 32px; }
+
+        .year-summary {
+            display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+            margin: 10px 0 24px; padding: 10px 16px;
+            background: var(--bg-soft); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); font-size: 12.5px; color: var(--text-muted);
+        }
+        .year-summary .ys-label {
+            font-weight: 700; color: var(--text-dim); font-size: 11.5px;
+            text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px;
+        }
+        .year-summary .ys-item {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 999px; padding: 3px 10px;
+        }
+        .year-summary .ys-name { color: var(--text-muted); }
+        .year-summary .ys-amount { font-family: var(--mono); color: var(--text); font-weight: 600; }
         @media (max-width: 640px) {
             .input.search { min-width: 0; flex: 1 1 100%; }
             .search-group { flex: 1 1 100%; }
@@ -454,6 +474,7 @@
         'transaction_explorer_url_link',
         'address_explorer_url_link',
         'event',
+        'event_number',
         'event_date_time_utc',
         'event_id',
         'event_date_time_mez',
@@ -472,8 +493,10 @@
     const FULL_WIDTH_NOWRAP = new Set(['transaction_id', 'blockhash']);
     const FULL_WIDTH_WRAP = new Set(['description_owner', 'description_authority']);
 
-    // Document columns (used to recognize document fields)
+    // Document columns (supports both document_N and documents_N variants)
     const DOCUMENT_COLS = new Set([
+        'document_1','document_2','document_3','document_4','document_5','document_6',
+        'document_7','document_8','document_9','document_10','document_11','document_12',
         'documents_1','documents_2','documents_3','documents_4','documents_5','documents_6',
         'documents_7','documents_8','documents_9','documents_10','documents_11','documents_12'
     ]);
@@ -524,7 +547,11 @@
         documents_1: 'Dokument 1',  documents_2: 'Dokument 2',  documents_3: 'Dokument 3',
         documents_4: 'Dokument 4',  documents_5: 'Dokument 5',  documents_6: 'Dokument 6',
         documents_7: 'Dokument 7',  documents_8: 'Dokument 8',  documents_9: 'Dokument 9',
-        documents_10: 'Dokument 10', documents_11: 'Dokument 11', documents_12: 'Dokument 12'
+        documents_10: 'Dokument 10', documents_11: 'Dokument 11', documents_12: 'Dokument 12',
+        document_1: 'Dokument 1',  document_2: 'Dokument 2',  document_3: 'Dokument 3',
+        document_4: 'Dokument 4',  document_5: 'Dokument 5',  document_6: 'Dokument 6',
+        document_7: 'Dokument 7',  document_8: 'Dokument 8',  document_9: 'Dokument 9',
+        document_10: 'Dokument 10', document_11: 'Dokument 11', document_12: 'Dokument 12'
     };
     function labelOf(col) {
         return FIELD_LABELS[col] || col;
@@ -547,7 +574,7 @@
             id: 'tx_extra',
             title: 'Block-Informationen',
             dot: '#94a3b8',
-            collapsedByDefault: true,
+            collapsedByDefault: false,
             columns: ['blockheight', 'blockhash']
         },
         {
@@ -585,6 +612,8 @@
             dot: '#22b8cf',
             collapsedByDefault: false,
             columns: [
+                'document_1','document_2','document_3','document_4','document_5','document_6',
+                'document_7','document_8','document_9','document_10','document_11','document_12',
                 'documents_1','documents_2','documents_3','documents_4','documents_5','documents_6',
                 'documents_7','documents_8','documents_9','documents_10','documents_11','documents_12'
             ]
@@ -648,7 +677,7 @@
         themeBtn.textContent = t === 'dark' ? '☀️ Hell' : '🌙 Dunkel';
         localStorage.setItem('sofv-theme', t);
     }
-    applyTheme(localStorage.getItem('sofv-theme') || 'light');
+    applyTheme(localStorage.getItem('sofv-theme') || 'dark');
     themeBtn.addEventListener('click', () => {
         const cur = document.documentElement.getAttribute('data-theme');
         applyTheme(cur === 'dark' ? 'light' : 'dark');
@@ -712,11 +741,30 @@
         const d = new Date(s);
         return isNaN(d.getTime()) ? null : d;
     }
+    function parseMEZDate(s) {
+        if (!s) return null;
+        // Format: DD.MM.YY HH:MM  or  DD.MM.YYYY HH:MM
+        const m = String(s).trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/);
+        if (!m) return null;
+        let year = parseInt(m[3], 10);
+        if (year < 100) year += 2000;
+        const month = parseInt(m[2], 10) - 1;
+        const day   = parseInt(m[1], 10);
+        const hour  = m[4] ? parseInt(m[4], 10) : 0;
+        const min   = m[5] ? parseInt(m[5], 10) : 0;
+        const d = new Date(year, month, day, hour, min);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    /** Returns the best available Date for a row (UTC → MEZ fallback). */
+    function getEffectiveDateForRow(row) {
+        return parseDateMaybe(row['event_date_time_utc'])
+            || parseMEZDate(row['event_date_time_mez'])
+            || null;
+    }
     function getYearFromRow(row) {
-        const d = parseDateMaybe(row['event_date_time_utc']);
-        if (d) return String(d.getUTCFullYear());
-        const raw = (row['event_date_time_utc'] || '').match(/\d{4}/);
-        return raw ? raw[0] : '—';
+        const d = getEffectiveDateForRow(row);
+        if (d) return String(d.getFullYear());
+        return '—';
     }
     function escapeHtml(s) {
         return String(s ?? '')
@@ -941,7 +989,7 @@
         groups = groups.slice().sort((a, b) => {
             const av = a.primary[sf] ?? '', bv = b.primary[sf] ?? '';
             if (dateLike) {
-                const da = parseDateMaybe(av), db = parseDateMaybe(bv);
+                const da = getEffectiveDateForRow(a.primary), db = getEffectiveDateForRow(b.primary);
                 if (da && db) return (da - db) * dir;
                 if (da && !db) return -1 * dir;
                 if (!da && db) return 1 * dir;
@@ -1153,10 +1201,17 @@
     }
 
     function renderDocumentsSection(group, sec, cardIdx) {
-        const row = group.primary;
         const cols = sec.columns.filter(c => state.headers.includes(c) && state.visibleCols.has(c));
+        // Search all rows in the group (not just primary) to find document values,
+        // so documents aren't lost when a non-primary row carries them.
         const docs = cols
-            .map(c => ({ col: c, val: (row[c] || '').trim() }))
+            .map(c => {
+                for (const r of group.rows) {
+                    const v = (r[c] || '').trim();
+                    if (nonEmpty(v)) return { col: c, val: v };
+                }
+                return { col: c, val: '' };
+            })
             .filter(d => nonEmpty(d.val));
         if (!docs.length) return '';
 
@@ -1190,6 +1245,7 @@
         const color = state.eventColors.get(ev) || 'var(--accent)';
         const when = row['event_date_time_mez'] || row['event_date_time_utc'] || '';
         const id = row['event_id'] || '';
+        const eventNumber = row['event_number'] || '';
 
         const sectionsHtml = SECTIONS.map(sec => {
             if (sec.id === 'documents') return renderDocumentsSection(group, sec, cardIdx);
@@ -1209,6 +1265,7 @@
                     ${nonEmpty(id) ? `<span class="badge subtle">#${escapeHtml(id)}</span>` : ''}
                     ${multiBadge}
                     ${nonEmpty(when) ? `<span class="when">🕒 ${escapeHtml(when)}</span>` : ''}
+                    ${nonEmpty(eventNumber) ? `<span class="when">📌 Event ${escapeHtml(eventNumber)}</span>` : ''}
                 </header>
                 <div class="card-body">${sectionsHtml}</div>
             </article>`;
@@ -1269,6 +1326,28 @@
     }
 
     /* =========================================================
+       Year summary (compact buy totals shown after each year group)
+       ========================================================= */
+    function renderYearSummaryHtml(year, yearGroups) {
+        const sums = new Map();
+        for (const g of yearGroups) {
+            for (const r of g.rows) {
+                if ((r.event || '').toLowerCase() !== 'buy') continue;
+                const name = (r.exchange_name || '').trim() || '— ohne Börse —';
+                const amount = parseGermanNumber(r.amount_euro);
+                if (isNaN(amount)) continue;
+                sums.set(name, (sums.get(name) || 0) + amount);
+            }
+        }
+        if (!sums.size) return '';
+        const entries = Array.from(sums.entries()).sort((a, b) => b[1] - a[1]);
+        const itemsHtml = entries.map(([name, sum]) =>
+            `<span class="ys-item"><span class="ys-name">${escapeHtml(name)}</span><span class="ys-amount">${escapeHtml(formatGermanNumber(sum))} €</span></span>`
+        ).join('');
+        return `<div class="year-summary"><span class="ys-label">Käufe ${escapeHtml(year)}</span>${itemsHtml}</div>`;
+    }
+
+    /* =========================================================
        Top-level render
        ========================================================= */
     function renderCards() {
@@ -1303,11 +1382,14 @@
                 const y = getYearFromRow(g.primary);
                 counts.set(y, (counts.get(y) || 0) + 1);
             });
-            let lastYear = null, openGroup = false;
+            let lastYear = null, openGroup = false, yearGroups = [];
             groups.forEach((g, idx) => {
                 const y = getYearFromRow(g.primary);
                 if (y !== lastYear) {
-                    if (openGroup) html.push('</div>');
+                    if (openGroup) {
+                        html.push('</div>');
+                        html.push(renderYearSummaryHtml(lastYear, yearGroups));
+                    }
                     html.push(`
                         <div class="year-header">
                             <span>📅 ${escapeHtml(y)}</span>
@@ -1316,10 +1398,15 @@
                         <div class="cards">`);
                     openGroup = true;
                     lastYear = y;
+                    yearGroups = [];
                 }
+                yearGroups.push(g);
                 html.push(renderCard(g, idx));
             });
-            if (openGroup) html.push('</div>');
+            if (openGroup) {
+                html.push('</div>');
+                html.push(renderYearSummaryHtml(lastYear, yearGroups));
+            }
         } else {
             html.push('<div class="cards">');
             groups.forEach((g, idx) => html.push(renderCard(g, idx)));
@@ -1429,6 +1516,30 @@
 
     const panel = document.getElementById('colPanel');
     document.getElementById('colPanelHeader').addEventListener('click', () => panel.classList.toggle('collapsed'));
+
+    // Auto-load the example CSV on startup (fails silently if not present)
+    (function autoLoadDefaultCSV() {
+        const fileName = 'mittelherkunftsnachweis-beispiel.csv';
+        const url = 'https://orangebitman.github.io/Source-Of-Funds-Viewer/' + fileName;
+        const doLoad = (text) => { if (text) loadCSVText(text, fileName); };
+        fetch(url)
+            .then(res => res.ok ? res.text() : Promise.reject('not ok'))
+            .then(doLoad)
+            .catch(() => {
+                // Fallback: try local resources/ folder (file:// protocol XHR)
+                try {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', 'resources/' + fileName, true);
+                    xhr.onload = function () {
+                        if ((xhr.status === 0 || (xhr.status >= 200 && xhr.status < 300)) && xhr.responseText) {
+                            doLoad(xhr.responseText);
+                        }
+                    };
+                    xhr.onerror = function () {};
+                    xhr.send();
+                } catch (e) {}
+            });
+    })();
 </script>
 </body>
 </html>
